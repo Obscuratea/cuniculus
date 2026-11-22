@@ -4,8 +4,8 @@
 //   12 big spikes  = bass      20 medium spikes = mids      30 small spikes = highs
 // Each spike family follows its own band, so a kick visibly punches the 12 big spikes out and lets
 // them sink back. Every kick also sends a ring across the spectrum disk and a shock shell out from
-// the star. The disk and the camera turn with the tempo. At full energy (a drop) two plasma jets
-// fire from the poles. Nothing is allowed to flash the whole frame.
+// the star. The disk and the camera turn with the tempo. At full energy (a drop) two particle
+// streams open from the poles. Nothing is allowed to flash the whole frame.
 
 #define TAU 6.28318530718
 #define PI 3.14159265359
@@ -183,22 +183,55 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
         }
     }
 
-    // plasma jets from the poles, only at full energy; they flicker with the highs
+    // particle streams from the poles, switched on by the track's energy. Each starts as a point at
+    // the star, fades in as it climbs and opens into a small V. The top stream goes up, the bottom
+    // one goes down behind the star and behind the disk rings. Highs make it sparkle and spread,
+    // every kick sends a bright pulse of particles along it.
     {
-        float jets = smoothstep(.72, .95, uEnergy);
-        if (jets > 0.0){
-            // closest approach between the view ray and the vertical axis through the star
-            vec2 o = ro.xz, d2 = rd.xz;
-            float tj = -dot(o, d2)/max(dot(d2, d2), 1e-5);
-            float dj = length(o + d2*tj);
-            float yj = ro.y + rd.y*tj;
-            if (tj > 0.0 && (tOrb < 0.0 || tj < tOrb || abs(yj) > gR)){
-                float along = abs(yj);
-                float wj = .03 + .05*along;
-                float flick = .6 + .4*sin(along*9.0 - iTime*14.0) * (.4 + .6*uHigh);
-                col += mix(palette(.55 + along*.1), vec3(1.0), .3) * exp(-dj*dj/(wj*wj)) * smoothstep(gR*.7, gR + .4, along)
-                       * exp(-along*.33) * jets * flick * (.5 + .7*uKick + .4*uBass) * min(I, 1.5);
+        float amt = smoothstep(.5, .9, uEnergy);
+        // closest approach between the view ray and the vertical axis: skip rays far from both streams
+        vec2 o = ro.xz, d2 = rd.xz;
+        float tj = -dot(o, d2)/max(dot(d2, d2), 1e-5);
+        float dj = length(o + d2*tj);
+        if (amt > 0.0 && dj < 1.25){
+            float tDisk = abs(rd.y) > 1e-4 ? -ro.y/rd.y : -1.0;
+            float diskL = 0.0;
+            if (tDisk > 0.0){
+                vec3 dc = disk(ro + rd*tDisk, I);
+                diskL = clamp(dot(dc, vec3(.3, .6, .1))*2.2, 0.0, .9);     // the rings hide what is behind them
             }
+            const int NP = 84;
+            const float H = 3.4;
+            vec3 acc = vec3(0.0);
+            for (int k = 0; k < 2*NP; k++){
+                float dirn = k < NP ? 1.0 : -1.0;
+                float fi = float(k < NP ? k : k - NP);
+                float h1 = hash21(vec2(fi, dirn*3.7)), h2 = hash21(vec2(fi*1.7, dirn + 9.1)), h3 = hash21(vec2(fi + 40.0, dirn*5.3));
+                float ph = fract(h1 + uTravel*(.07 + .05*h2));           // 0 at the star, 1 at the end of the stream
+                float h = ph*H;
+                float spread = (.02 + .36*h)*(.45 + .8*h2)*(1.0 + .6*uHigh);   // the V
+                float ang = h3*TAU + h*.9*(h2 - .5);
+                vec3 pos = vec3(cos(ang)*spread, dirn*(gR + .08 + h), sin(ang)*spread);
+                float tp = dot(pos - ro, rd);
+                if (tp < 0.0) continue;
+                if (tOrb > 0.0 && tp > tOrb) continue;                    // the star hides what is behind it
+                float dd = length(cross(rd, pos - ro));
+                float sz = .012 + .020*ph + .006*h2;
+                if (dd > sz*3.0) continue;
+                float vis = smoothstep(.0, .22, ph)*(1.0 - ph)*(1.0 - ph);
+                float tw = .55 + .45*sin(iTime*(6.0 + 14.0*h2) + h3*40.0);
+                tw = mix(tw, tw*tw*2.2, uHigh);
+                float pulse = 0.0;
+                for (int j = 0; j < 4; j++){
+                    float age = uOnsetAge[j];
+                    if (age > 1.2) continue;
+                    pulse += uOnsetPow[j]*exp(-(h - age*4.2)*(h - age*4.2)*1.6)*exp(-age*1.4);
+                }
+                float c = exp(-dd*dd/(sz*sz))*vis*tw*(1.6 + 3.5*pulse + 1.2*uBass);
+                if (dirn < 0.0 && tDisk > 0.0 && tp > tDisk) c *= 1.0 - diskL;
+                acc += mix(palette(.55 + ph*.3 + h2*.1 + uKickCount*.05), vec3(1.0), .12 + .18*ph)*c;
+            }
+            col += acc*amt*min(I, 1.5);
         }
     }
 

@@ -1,7 +1,7 @@
 {
   "name": "Lodestar",
   "author": "Cuniculus",
-  "description": "A liquid-metal star. Bass, mids and highs each drive their own family of spikes, a spectrum disk turns with the tempo, every kick sends out a ring and a shock shell, and plasma jets fire at full energy.",
+  "description": "A liquid-metal star. Bass, mids and highs each drive their own family of spikes, a spectrum disk turns with the tempo, every kick sends out a ring and a shock shell, and particle streams open from the poles at full energy.",
   "shader": "scene.frag",
   "bloom": 0.55,
   "aberration": 0.8,

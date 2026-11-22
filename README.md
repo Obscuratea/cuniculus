@@ -10,7 +10,7 @@ tunnel from Sonique. *Cuniculus* is Latin for rabbit and for burrow.
   shape every 16 kicks, and a laser fan opens up when the track is at full energy.
 - **Lodestar**: a liquid-metal star with three families of spikes, one each for bass, mids and
   highs, so a kick visibly punches the big spikes out. A spectrum disk turns with the tempo,
-  every kick sends out a ring and a shock shell, and plasma jets fire at full energy.
+  every kick sends out a ring and a shock shell, and particle streams open from the poles at full energy.
 - **Cymatica**: glowing sand on a vibrating Chladni plate. The pattern follows the pitch of the
   music: low sounds make a few big shapes, higher sounds make finer lattices, and as the pitch
   slides the lines morph from one figure to the next. Every bass hit tosses grains of sand
