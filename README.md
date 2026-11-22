@@ -4,6 +4,20 @@ A music visualizer for whatever your system is playing, inspired by the rabbit-h
 tunnel from Sonique. *Cuniculus* is Latin for rabbit and for burrow.
 
 - Listens to system output through PipeWire. No player, no setup.
+- Five visualizers, made to feel the music: they react to the kick, the pitch and how big the
+  moment is (a breakdown looks calm, a drop goes all out), not just to loudness.
+
+![Rabbit Hole](screenshots/rabbit-hole.jpg)
+
+| | |
+|---|---|
+| ![Lodestar](screenshots/lodestar.jpg) | ![Cymatica](screenshots/cymatica.jpg) |
+| ![Fiesta](screenshots/fiesta.jpg) | ![Nova](screenshots/nova.jpg) |
+
+*Screenshots are from the built-in demo track, at its drop.*
+
+## Visualizers
+
 - **Rabbit Hole**: a twisting neon tunnel. Wall panels are the spectrum, floating rings follow
   the mids, glitter follows the highs, and light trails weave down the middle. Every kick fires
   a ring of light ahead of you, surges the speed and steps the colours; the tunnel changes
@@ -21,12 +35,14 @@ tunnel from Sonique. *Cuniculus* is Latin for rabbit and for burrow.
   and searchlights sweep when the track is at full energy.
 - **Nova**: a radial spectrum burst that turns with the tempo and sends a ring out on every
   kick. Also the small example plugin to copy.
-- Visualizers are plugins: a folder with one shader file. See [PLUGINS.md](PLUGINS.md).
+
+Visualizers are plugins: a folder with one shader file. See [PLUGINS.md](PLUGINS.md) to write your own.
 
 ## Run
 
     ./run.sh            # system audio
     ./run.sh --demo     # built-in silent demo track (breakdown, build, drop), no sound needed
+    ./run.sh --demo --demo-at 27   # start the demo at its drop (0 breakdown, 15 build, 52 outro)
     ./install.sh        # adds Cuniculus to the app launcher (no sudo)
 
 ## Requirements
@@ -47,7 +63,9 @@ There is no distro package yet; for now clone the folder and run `./run.sh`.
 
 ## Controls
 
-Move the mouse to show the control strip.
+Move the mouse to show the control strip; it hides itself after a couple of seconds.
+
+![Control strip](screenshots/controls.jpg)
 
 | Key | Action |
 |---|---|

@@ -40,6 +40,7 @@ class Window(QWidget):
         self.resize(1280, 720)
         self.setMinimumSize(320, 200)
         self.setStyleSheet(STYLE)
+        self.no_save = bool(args.shot)          # test runs must not overwrite the user's saved choices
         self.audio = AudioEngine(demo=args.demo, demo_at=args.demo_at)
         self.plugins = discover()
         self.settings = self._load_settings()
@@ -93,6 +94,8 @@ class Window(QWidget):
             return {}
 
     def _save_settings(self) -> None:
+        if self.no_save:
+            return
         try:
             SETTINGS.parent.mkdir(parents=True, exist_ok=True)
             SETTINGS.write_text(json.dumps({
