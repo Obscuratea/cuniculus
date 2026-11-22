@@ -1,0 +1,9 @@
+{
+  "name": "Rabbit Hole",
+  "author": "Cuniculus",
+  "description": "Fall down a twisting neon tunnel. Wall panels are the spectrum, rings pulse with the mids, light trails and glittering galaxy dust weave down the middle.",
+  "shader": "scene.frag",
+  "bloom": 0.7,
+  "aberration": 1.0,
+  "order": 0
+}

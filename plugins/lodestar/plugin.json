@@ -1,0 +1,9 @@
+{
+  "name": "Lodestar",
+  "author": "Cuniculus",
+  "description": "A liquid-metal star. Bass, mids and highs each drive their own family of spikes, a spectrum disk turns with the tempo, and every beat sends a ring out across it.",
+  "shader": "scene.frag",
+  "bloom": 0.55,
+  "aberration": 0.8,
+  "order": 5
+}

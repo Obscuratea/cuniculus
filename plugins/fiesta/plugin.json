@@ -1,0 +1,9 @@
+{
+  "name": "Fiesta",
+  "author": "Cuniculus",
+  "description": "A fireworks show over a city and a lake. Every beat launches a shell (rings, hearts, stars, willows), the skyline buildings are the spectrum, and the highs rain confetti.",
+  "shader": "scene.frag",
+  "bloom": 0.9,
+  "aberration": 0.4,
+  "order": 8
+}

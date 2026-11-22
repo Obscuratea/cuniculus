@@ -1,0 +1,9 @@
+{
+  "name": "Cymatica",
+  "author": "Cuniculus",
+  "description": "Glowing sand on a vibrating Chladni plate. Bass, mids and highs each shake out their own pattern, the sand migrates between them, and every beat throws it into the air.",
+  "shader": "scene.frag",
+  "bloom": 0.7,
+  "aberration": 0.6,
+  "order": 7
+}
