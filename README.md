@@ -74,3 +74,7 @@ Move the mouse to show the control strip; it hides itself after a couple of seco
 | P / Shift+P | next / previous colour palette |
 | R | rescan plugins |
 | Q | quit |
+
+## License
+
+MIT - see [LICENSE](LICENSE). Fork it, change it, and build and share your own plugins (see [PLUGINS.md](PLUGINS.md)).
