@@ -40,6 +40,7 @@ class Features:
     pitch: float = 0.5               # where the sound's centre of mass sits, 0 (low) .. 1 (high), self-ranging
     bass_hits: int = 0               # count of sudden jumps in the bass band only (kick/sub drops)
     bass_power: float = 0.0          # strength of the latest one, 0..1
+    energy: float = 0.0              # slow loudness against the track's recent maximum: breakdown low, drop high
 
 
 class Analyzer:
@@ -63,6 +64,15 @@ class Analyzer:
         self.spec = np.zeros(NBANDS, np.float32)
         self.prev_norm = np.zeros(NBANDS, np.float32)
         self.bass = self.mid = self.high = self.level = 0.0
+        # raw FFT bin ranges for the punchy band followers
+        self.rb = np.where((freqs >= 30.0) & (freqs < 150.0))[0]
+        self.rm = np.where((freqs >= 150.0) & (freqs < 2000.0))[0]
+        self.rh = np.where((freqs >= 2000.0) & (freqs < 16000.0))[0]
+        self.ref = np.full(4, 1e-4)          # slow peak per band (bass, mid, high, all)
+        self.rms_db = -90.0
+        self.loud_ref = -50.0
+        self.energy = 0.0
+        self.kick_act = 0.0
         self.cent, self.cl, self.ch, self.pitch = 0.5, 0.4, 0.6, 0.5
         # the bass-hit detector has its own, longer FFT: more bins in the bass range, so noise cannot
         # fake a jump by chance (3 bins at 2048 points, 7 at 4096)
@@ -124,10 +134,24 @@ class Analyzer:
             self.ch += (self.cent - self.ch) * 0.0004
             self.cl, self.ch = min(self.cl, self.cent), max(self.ch, self.cent)
             self.pitch = float(np.clip((self.cent - self.cl) / max(self.ch - self.cl, 0.12), 0.0, 1.0))
-        self.bass = self._follow(self.bass, float(norm[self.m_bass].mean()) * 1.25, 0.65, 0.12)
-        self.mid = self._follow(self.mid, float(norm[self.m_mid].mean()) * 1.25, 0.5, 0.10)
-        self.high = self._follow(self.high, float(norm[self.m_high].mean()) * 1.5, 0.5, 0.12)
-        self.level = self._follow(self.level, float(norm.mean()) * 1.3, 0.4, 0.06)
+        # bass / mid / high / level: each band's raw energy against its own slow peak, on a linear
+        # scale. A log scale squashed a pumping kick into 0.7..0.9; this swings nearly 0..1 with it.
+        rms = float(np.sqrt(np.mean(hop * hop)))
+        e = np.array([np.sqrt(np.mean(mag[self.rb] ** 2)), np.sqrt(np.mean(mag[self.rm] ** 2)),
+                      np.sqrt(np.mean(mag[self.rh] ** 2)), rms])
+        self.ref = np.maximum(self.ref * np.exp(-HOP_DT / 5.0), np.maximum(e, 1e-4))
+        x = np.where(self.ref > 2.5e-4, (e / self.ref) ** 0.8, 0.0)
+        self.bass = self._follow(self.bass, float(x[0]), 0.8, 0.22)
+        self.mid = self._follow(self.mid, float(x[1]), 0.7, 0.18)
+        self.high = self._follow(self.high, float(x[2]), 0.7, 0.20)
+        self.level = self._follow(self.level, float(x[3]), 0.5, 0.08)
+        # energy: loudness over about half a second against the loudest the track has been lately
+        self.rms_db += (20.0 * np.log10(rms + 1e-6) - self.rms_db) * (1.0 - np.exp(-HOP_DT / 0.5))
+        self.loud_ref = max(self.loud_ref - 0.35 * HOP_DT, self.rms_db, -50.0)
+        # ...and it only counts as full energy while bass hits keep coming (a loud intro is not a drop)
+        self.kick_act *= np.exp(-HOP_DT / 2.5)
+        loud = float(np.clip(1.0 + (self.rms_db - self.loud_ref) / 14.0, 0.0, 1.0)) if self.rms_db > -55.0 else 0.0
+        self.energy = loud * (0.55 + 0.45 * self.kick_act)
 
         # onset detection: spectral flux, weighted towards the low end
         diff = np.maximum(norm - self.prev_norm, 0.0)
@@ -137,7 +161,8 @@ class Analyzer:
         self.flux_hist[-1] = flux
         recent = self.flux_hist[-int(HOP_RATE):]
         self.since_onset += HOP_DT
-        self.phase += HOP_DT * (self.bpm if self.bpm > 0 else 120.0) / 60.0
+        # with no tempo found the clock idles along with the loudness, and stops in silence
+        self.phase += HOP_DT * (self.bpm if self.bpm > 0 else 70.0 * self.level) / 60.0
         if (flux > recent.mean() * 1.8 + 0.03 and flux >= self.prev_flux
                 and self.since_onset > 0.26):
             self.since_onset = 0.0
@@ -171,6 +196,7 @@ class Analyzer:
             self.since_bass = 0.0
             self.bass_hits += 1
             self.bass_power = float(np.clip(0.35 + 0.65 * db / self.eb_peak, 0.0, 1.0))
+            self.kick_act = min(1.0, self.kick_act + 0.34)
         self.prev_bflux = db
 
         self.hops += 1
@@ -211,8 +237,9 @@ class Analyzer:
 class AudioEngine:
     """Owns the capture thread. `snapshot()` is safe to call from the UI thread."""
 
-    def __init__(self, demo: bool = False) -> None:
+    def __init__(self, demo: bool = False, demo_at: float = 0.0) -> None:
         self.demo = demo
+        self.demo_at = demo_at
         self.an = Analyzer()
         self.lock = threading.Lock()
         self.feat = Features()
@@ -234,7 +261,7 @@ class AudioEngine:
         a = self.an
         f = Features(a.bass, a.mid, a.high, a.level, a.bpm, a.phase % 1.0, a.beat_count,
                      a.last_beat, a.spec.copy(), a.wave(), status, a.phase, a.pitch,
-                     a.bass_hits, a.bass_power)
+                     a.bass_hits, a.bass_power, a.energy)
         with self.lock:
             self.feat = f
 
@@ -244,7 +271,7 @@ class AudioEngine:
             self.feat = Features(0, 0, 0, 0, 0, 0, f.beat_count, f.last_beat,
                                  np.zeros(NBANDS, np.float32),
                                  np.full(NWAVE, 0.5, np.float32), status, f.beat_clock, f.pitch,
-                                 f.bass_hits, f.bass_power)
+                                 f.bass_hits, f.bass_power, 0.0)
 
     def _run(self) -> None:
         if self.demo:
@@ -284,26 +311,20 @@ class AudioEngine:
                 time.sleep(2.0)
 
     def _run_demo(self) -> None:
-        """Synthetic 124 BPM track so the visuals can be tested without sound."""
-        rng = np.random.default_rng(7)
-        bpm = 124.0
-        beat = 60.0 / bpm
-        n = 0
+        """Loop the built-in EDM arrangement (breakdown, build, drop) so the visuals can be tried
+        and tested without any sound playing."""
+        from . import demo
+        sig = demo.make()
+        n = (int(self.demo_at * RATE) // HOP * HOP) % (len(sig) - HOP)
+        done = 0
         t0 = time.monotonic()
-        notes = [110.0, 164.8, 220.0, 261.6, 329.6, 261.6, 220.0, 164.8]
         while self.running:
-            t = (n + np.arange(HOP)) / RATE
-            tb = np.mod(t, beat)
-            kick = np.sin(2 * np.pi * (45 * tb + 9.0 * (1 - np.exp(-tb * 30)))) * np.exp(-tb * 9) * 0.8
-            th = np.mod(t + beat / 2, beat / 2)
-            hat = rng.standard_normal(HOP) * np.exp(-th * 60) * 0.12
-            step = (np.floor(t / (beat / 2)).astype(int)) % len(notes)
-            f = np.array(notes)[step]
-            arp = (np.mod(t * f, 1.0) - 0.5) * 0.25 * np.exp(-np.mod(t, beat / 2) * 5)
-            sweep = np.sin(2 * np.pi * t * (800 + 600 * np.sin(t * 0.7))) * 0.08
-            self.an.process((kick + hat + arp + sweep).astype(np.float32))
-            self._publish("demo signal")
+            self.an.process(sig[n:n + HOP])
+            self._publish("demo track")
             n += HOP
-            delay = t0 + n / RATE - time.monotonic()
+            done += HOP
+            if n + HOP > len(sig):
+                n = 0
+            delay = t0 + done / RATE - time.monotonic()
             if delay > 0:
                 time.sleep(delay)

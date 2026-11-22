@@ -1,7 +1,8 @@
 // Fiesta - fireworks over a city and a lake.
 //
-// Every beat of the tempo clock launches a shell. Each shell has its own random spot, size, colour
-// and shape (sphere, ring, heart, star, willow). The skyline is the spectrum: buildings grow with
+// Every kick explodes a shell at that instant, sized by how hard it hit; each has its own spot,
+// colour and shape (sphere, ring, heart, star, willow). Snares and claps pop small crackles.
+// Searchlights sweep from the skyline when the track is at full energy. The skyline is the spectrum: buildings grow with
 // their frequency band and their windows light up when it is loud. The moon bounces on the bass,
 // the highs rain confetti, and the lake reflects it all. Nothing flashes the whole sky.
 
@@ -24,57 +25,83 @@ vec2 shapeDir(float type, float a, float j, float seed){
     return d*(.3 + .7*hash11(j*1.9 + seed));                                          // willow
 }
 
+// one burst: N sparks thrown from 'apex' in shape 'type', 't' seconds ago
+vec3 burst(vec2 p, vec2 apex, float t, float S, float type, float seed, vec3 c1, vec3 c2){
+    float grow = 1.0 - exp(-t*4.5);
+    float life = type > 3.5 ? 1.2 : .85;                     // willows hang around longer
+    float fade = exp(-t/life*2.2);
+    float reach = S*1.5 + .2 + .3*t*t;
+    float dc = length(p - apex);
+    if (fade < .02 || dc > reach) return vec3(0.0);
+    fade *= smoothstep(0.0, .06, t) * smoothstep(reach, reach*.6, dc);      // no pile-up at the start, no hard edge
+    vec3 col = c2 * exp(-t*16.0) * .0003/(dc*dc + .002);                    // soft flash at the centre
+    const int N = 34;
+    for (int j = 0; j < N; j++){
+        float fj = float(j);
+        float a = fj/float(N)*TAU + seed*6.0;
+        vec2 off = shapeDir(type, a, fj, seed)*S*grow;
+        float g = type > 3.5 ? .30 : .09;
+        vec2 pos = apex + off + vec2(0.0, -g*t*t);
+        float d = length(p - pos);
+        float tw = .55 + .45*sin(t*38.0 + fj*7.0 + seed*30.0);
+        tw = mix(tw, tw*tw*2.0, uHigh);                       // highs make it glitter
+        vec3 pc = mix(c1, c2, step(.5, hash11(fj + seed*9.0)));
+        col += pc*fade*tw*.00010/(d*d + .000006);
+    }
+    return col;
+}
+
+// Fireworks burst ON the music: every bass hit (kick) explodes a shell right then, sized by how hard
+// it hit. Lighter hits (snares, claps) pop small crackles. Nothing is launched on a timer.
 vec3 fireworks(vec2 p, float I){
     vec3 col = vec3(0.0);
-    float bd = 60.0/(uBpm > 40.0 ? uBpm : 120.0);
-    float clk = uBeatClock*.5;                              // one shell every second beat keeps the sky readable
-    float base = floor(clk);
     for (int k = 0; k < 4; k++){
-        float id = base - float(k);
-        float age = (clk - id)*2.0*bd;                       // seconds since launch
+        float age = uOnsetAge[k];
+        if (age > 2.2) continue;
+        float id = uOnsetId[k], pw = uOnsetPow[k];
         float h1 = hash11(id*1.37), h2 = hash11(id*2.91 + 4.0), h3 = hash11(id*5.13 + 9.0);
         float h4 = hash11(id*7.77 + 2.0), h5 = hash11(id*3.31 + 6.0);
-        vec2 apex = vec2((h1 - .5)*1.5, HOR + .22 + .42*h2);
-        const float TR = .55;                                // rise time
-        float type = floor(h4*5.0);
-        vec3 c1 = palette(h5), c2 = palette(h5 + .33 + .3*h3);
-        if (age < TR){
-            float a = age/TR, e = 1.0 - (1.0 - a)*(1.0 - a);
-            vec2 rp = vec2(apex.x + .02*sin(age*30.0), HOR + (apex.y - HOR)*e);
-            for (int s = 0; s < 6; s++){                    // short fading tail
-                vec2 q = rp - vec2(0.0, float(s)*.012);
-                float d = length(p - q);
-                col += mix(vec3(1.0, .8, .5), c1, .4) * .00025/(d*d + .000012) * (1.0 - float(s)/6.0);
-            }
-        } else {
-            float t = age - TR;
-            float S = (.16 + .13*h3)*(.85 + .5*uBass)*(.8 + .2*min(I, 1.5));
-            float grow = 1.0 - exp(-t*3.8);
-            float life = type > 3.5 ? 1.0 : 1.7;            // willows hang around longer
-            float fade = exp(-t/life*1.5)*smoothstep(.0, .06, t);
-            if (fade < .01) continue;
-            col += c2 * exp(-t*16.0) * .0006/(dot(p - apex, p - apex) + .002);   // soft flash at the burst point
-            const int N = 34;
-            for (int j = 0; j < N; j++){
-                float fj = float(j);
-                float a = fj/float(N)*TAU + h1*6.0;
-                vec2 off = shapeDir(type, a, fj, id)*S*grow;
-                float g = type > 3.5 ? .22 : .07;
-                vec2 pos = apex + off + vec2(0.0, -g*t*t);
-                float d = length(p - pos);
-                float tw = .55 + .45*sin(t*38.0 + fj*7.0 + h2*30.0);
-                tw = mix(tw, tw*tw*2.0, uHigh);               // highs make it glitter
-                vec3 pc = mix(c1, c2, step(.5, hash11(fj + id)));
-                col += pc*fade*tw*.00010/(d*d + .000006);
-            }
-        }
+        vec2 apex = vec2((h1 - .5)*1.5, HOR + .24 + .40*h2);
+        float S = (.10 + .10*h3 + .12*pw)*(.8 + .2*min(I, 1.5));
+        col += burst(p, apex, age, S, floor(h4*5.0), h1 + id, palette(h5), palette(h5 + .33 + .3*h3)) * (.5 + .7*pw);
+        // the streak it rode up on, still fading
+        float sx = abs(p.x - apex.x - .01*sin(p.y*40.0));
+        col += mix(vec3(1.0, .8, .5), palette(h5), .5) * exp(-sx*sx*9000.0) * step(HOR, p.y) * step(p.y, apex.y)
+               * smoothstep(HOR, apex.y, p.y) * exp(-age*7.0) * .5;
+    }
+    // crackle: any other onset (snare, clap, hat accent) pops a small cluster
+    {
+        float id = uBeatCount;
+        vec2 apex = vec2((hash11(id*4.1) - .5)*1.6, HOR + .15 + .5*hash11(id*9.7 + 1.0));
+        float t = -log(max(uBeat, 1e-3))/5.0;                 // uBeat = exp(-5 t)
+        col += burst(p, apex, t, .05 + .03*hash11(id), 0.0, id*.37, vec3(1.0, .9, .7), palette(hash11(id*2.3))) * .55 * uBeat;
     }
     return col*min(I, 1.6);
 }
 
+// festival searchlights from the skyline: sweep at the tempo, only bright when the track is at full energy
+vec3 searchlights(vec2 p, float I){
+    float on = smoothstep(.65, .92, uEnergy);
+    if (on <= 0.0 || p.y < HOR) return vec3(0.0);
+    vec3 col = vec3(0.0);
+    for (int i = 0; i < 4; i++){
+        float fi = float(i);
+        vec2 o = vec2((fi - 1.5)*.42, HOR + .02);
+        float ang = .9*sin(uBeatClock*TAU/8.0 + fi*1.7) * (mod(fi, 2.0) < .5 ? 1.0 : -1.0);
+        vec2 d = vec2(sin(ang), cos(ang));
+        vec2 r = p - o;
+        float along = dot(r, d);
+        if (along < 0.0) continue;
+        float perp = abs(r.x*d.y - r.y*d.x);
+        float w = .004 + .035*along;
+        col += palette(fi*.25 + uKickCount*.09) * exp(-perp*perp/(w*w)) * exp(-along*1.6) * (.10 + .22*uKick + .08*uBass);
+    }
+    return col*on*min(I, 1.5);
+}
+
 // the moon, bouncing on the bass
 vec3 moon(vec2 p, vec2 ctr){
-    float r = .055*(1.0 + .12*uBass + .05*uBeat);
+    float r = .055*(1.0 + .10*uBass + .10*uKick);
     vec2 q = p - ctr - vec2(0.0, .012*uBass);
     float d = length(q);
     vec3 c = vec3(.95, .93, .8)*smoothstep(r, r - .004, d)*.38;
@@ -117,6 +144,7 @@ vec3 scene(vec2 p, float I){
     float tw = .4 + .6*sin(iTime*(1.0 + 4.0*h) + h*80.0);
     col += vec3(.9, .95, 1.0)*step(.965, h)*smoothstep(.12, .0, length(f))*tw*.6*smoothstep(.0, .25, up);
     col += moon(p, vec2(-.3*aspect*1.45, .29));
+    col += searchlights(p, I);
     col += fireworks(p, I);
     return city(p, col);
 }

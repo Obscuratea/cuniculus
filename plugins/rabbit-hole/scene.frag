@@ -1,7 +1,7 @@
 // Rabbit Hole - Cuniculus' main visualizer.
 // Bass: tunnel breathes, camera pushes in.   Mids: floating neon rings.
-// Highs: glitter.   Spectrum: the wall panels.   Beat: a ring of light racing ahead + shape change
-// every 16 beats.   Light trails and galaxy dust streams weave down the middle.
+// Highs: glitter.   Spectrum: the wall panels.   Kick: a ring of light racing ahead, a speed surge and
+// a colour step; the tunnel changes shape every 16 kicks.   Energy (breakdown vs drop): laser fan.   Light trails and galaxy dust streams weave down the middle.
 // Rule: nothing may flash the whole screen. Keep the walls dark enough to see the hole.
 
 #define TAU 6.28318530718
@@ -70,7 +70,7 @@ float ring(vec3 p, out float rid){
     l.xy *= rot(iTime*(h - .5)*1.6 + zc);
     float n = floor(h*4.0);
     float m = n < 1.0 ? length(l.xy) : ngon(l.xy, n + 2.0);
-    float rad = .75 + .55*spectrum(.1 + h*.5) + .15*uBeat;
+    float rad = .75 + .45*uMid + .2*spectrum(.1 + h*.5) + .15*uKick;
     return length(vec2(m - rad, l.z)) - .015;
 }
 
@@ -78,8 +78,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     vec2 uv = (fragCoord - .5*iResolution.xy) / iResolution.y;
     float I = uIntensity;
 
-    gSec = floor(uBeatCount/16.0);
-    gMorph = smoothstep(0.0, 1.0, clamp(mod(uBeatCount, 16.0) + 1.0 - uBeat, 0.0, 1.0));
+    gSec = floor(uKickCount/16.0);
+    gMorph = smoothstep(0.0, 1.0, clamp(mod(uKickCount, 16.0) + min(uOnsetAge.x*2.5, 1.0), 0.0, 1.0));
 
     // camera rides the tunnel's centre line
     float cz = uTravel;
@@ -89,21 +89,21 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     vec3 rt = normalize(cross(vec3(0, 1, 0), fw));
     vec3 up = cross(fw, rt);
     vec2 suv = uv * rot(sin(iTime*.21)*.5 + sin(uTravel*.043)*.7);
-    float focal = .78 - (.16*uBass + .05*uBeat)*min(I, 1.5);
+    float focal = .78 - (.10*uBass + .14*uKick)*min(I, 1.5);
     vec3 rd = normalize(fw*focal + suv.x*rt + suv.y*up);
 
     // march: solid wall, translucent glowing rings
     float t = 0.0, d = 0.0;
     vec3 glow = vec3(0.0);
     bool hit = false;
-    for (int i = 0; i < 96; i++){
+    for (int i = 0; i < 80; i++){
         vec3 p = ro + rd*t;
         d = wall(p);
         if (d < .002*(1.0 + t)){ hit = true; break; }
         float rid;
         float dr = ring(p, rid);
         float st = min(d*.8, max(dr, .04));
-        vec3 rc = palette(rid*.031 + iTime*.04 + .35);
+        vec3 rc = palette(rid*.031 + iTime*.04 + .35 + uKickCount*.09);
         glow += rc * st * .010/(.0015 + dr*dr) * exp(-t*.045) * mix(.08, 1.0, smoothstep(.8, 6.0, t));
         t += st;
         if (t > FAR) break;
@@ -124,14 +124,18 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
         float inner = smoothstep(.0, .07, f.x)*smoothstep(1.0, .93, f.x)
                     * smoothstep(.0, .09, f.y)*smoothstep(1.0, .91, f.y);
         vec3 pc = palette(band*.55 + p.z*.018 + iTime*.03);
-        col = pc * lit * inner * (.2 + 1.1*sp*sp) * min(I, 1.4);
+        col = pc * lit * inner * (.15 + .8*sp*sp) * min(I, 1.3);
         col += pc * inner * .02;                                  // faint unlit panel
-        col += palette(p.z*.02 + .5) * (1.0 - inner) * (.05 + .35*uMid);   // seams
+        col += palette(p.z*.02 + .5 + uKickCount*.09) * (1.0 - inner) * (.04 + .30*uMid + .25*uKick);   // seams
 
         // beat shockwave racing ahead of the camera
         // (starts well ahead and stays thin, so it never lights the walls around the camera)
-        float w = p.z - cz - 5.0 - (1.0 - uBeat)*32.0;
-        col += palette(uBeatCount*.137 + .1) * exp(-w*w*3.5) * 1.8 * uBeat;
+        for (int j = 0; j < 4; j++){
+            float age = uOnsetAge[j];
+            if (age > 1.6) continue;
+            float w = p.z - cz - 4.0 - age*46.0;
+            col += palette(uOnsetId[j]*.137 + .1) * exp(-w*w*3.0) * 2.2 * uOnsetPow[j] * exp(-age*2.2);
+        }
 
         // pulse line travelling with the bass
         float pl = fract(p.z*.125 - iTime*.6);
@@ -139,13 +143,13 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     }
     float fog = exp(-t*.05);
     col = col*fog + palette(iTime*.05 + .3)*(1.0 - fog)*(.015 + .08*uLevel);
-    col += glow * (.4 + 1.5*uMid) * min(I, 1.5);
+    col += glow * (.18 + .75*uMid*uMid + .35*uKick) * min(I, 1.5);
 
     // light trails + galaxy streams, sampled along the ray up to the wall
     vec3 streams = vec3(0.0);
     float tmax = min(t, 46.0);
     float jit = hash21(fragCoord);
-    const int NS = 72;
+    const int NS = 52;
     for (int i = 0; i < NS; i++){
         float x0 = (float(i) + jit)/float(NS);
         float ts = tmax*x0*x0;
@@ -176,12 +180,22 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
             streams += mix(gc, vec3(1.0), .65) * dens * star * dts * 5.0 * fade * (.4 + 2.5*uHigh);
         }
     }
-    col += streams * (.45 + .9*uLevel) * min(I, 1.6);
+    col += streams * (.28 + .45*uLevel + .25*uKick) * min(I, 1.6);
 
     // the light at the end of the hole
     vec3 endDir = normalize(vec3(path(cz + 30.0), cz + 30.0) - ro);
     float e = max(dot(rd, endDir), 0.0);
-    col += palette(iTime*.07) * (pow(e, 260.0)*(.6 + 1.2*uBeat + .6*uBass) + pow(e, 14.0)*.04*(1.0 + uLevel));
+    col += palette(iTime*.07) * (pow(e, 260.0)*(.5 + 1.6*uKick + .5*uBass) + pow(e, 14.0)*.04*(1.0 + uLevel));
+
+    // laser fan from the far end: only when the track is at full energy, sweeping at the tempo
+    {
+        vec3 ex = normalize(cross(endDir, vec3(0, 1, 0))), ey = cross(endDir, ex);
+        vec2 ev = vec2(dot(rd, ex), dot(rd, ey));
+        float ea = atan(ev.y, ev.x), er = length(ev);
+        float fan = pow(.5 + .5*sin(ea*5.0 + uBeatClock*TAU/8.0), 60.0) + pow(.5 + .5*sin(-ea*3.0 + uBeatClock*TAU/16.0 + 1.0), 90.0);
+        col += palette(ea/TAU + uKickCount*.09) * fan * exp(-er*3.2) * smoothstep(.02, .12, er)
+               * smoothstep(.72, .95, uEnergy) * (.25 + .9*uHigh + .6*uKick) * min(I, 1.5);
+    }
 
     // sparks streaking past, driven by the highs
     float ang = atan(uv.y, uv.x)/TAU, rad = length(uv);

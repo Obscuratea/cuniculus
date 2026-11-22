@@ -38,12 +38,15 @@ colour fringing, tonemapping, vignette and grain afterwards.
 | `iResolution` | vec3 | size in pixels |
 | `iTime`, `iTimeDelta` | float | seconds since start, last frame time |
 | `iFrame` | int | frame counter |
-| `uBass`, `uMid`, `uHigh` | float | 0..1, below 150 Hz, 150 Hz to 2 kHz, above 2 kHz |
-| `uLevel` | float | 0..1 overall loudness (auto-gained, so volume does not matter) |
-| `uBeat` | float | jumps to 1 on each beat, decays to 0 |
-| `uBeatCount` | float | number of beats so far |
+| `uBass`, `uMid`, `uHigh` | float | 0..1, below 150 Hz, 150 Hz to 2 kHz, above 2 kHz. Each is measured against its own recent peak, so it swings with the music (a kick takes `uBass` from low to 1 and back) |
+| `uLevel` | float | 0..1 loudness right now, against the recent peak (so volume does not matter) |
+| `uEnergy` | float | 0..1 slow "how big is this part of the track": low in a breakdown, near 1 in a drop with kicks. Good for switching big effects on and off |
+| `uKick` | float | jumps to the hit's strength on each bass hit (kick), decays to 0. Use this for anything that should punch |
+| `uKickCount` | float | number of bass hits so far; step colours or shapes with it |
+| `uBeat` | float | jumps to 1 on any onset (kick, snare, clap, accent), decays to 0. For bass only, use `uKick` |
+| `uBeatCount` | float | number of onsets so far |
 | `uBeatPhase` | float | 0..1 position between beats from the BPM clock |
-| `uBeatClock` | float | beats elapsed as a smooth number; use it to move or spin things at the tempo |
+| `uBeatClock` | float | beats elapsed as a smooth number; use it to move or spin things at the tempo. With no tempo found it idles along with the loudness and stops in silence |
 | `uPitch` | float | 0..1, where the sound's centre of mass sits (low to high), stretched to the range the music has covered recently |
 | `uOnsetAge`, `uOnsetPow`, `uOnsetId` | vec4 | the last 4 bass hits (a sudden jump in the low bass only, so snares, hats and sustained bass notes do not count), newest first: seconds since each, strength 0..1, and a number unique to each (for hashing). Age is 99 when there is no hit |
 | `uBpm` | float | tempo estimate, 0 if unknown |

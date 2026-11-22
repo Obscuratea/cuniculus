@@ -1,7 +1,7 @@
 {
   "name": "Nova",
   "author": "Cuniculus",
-  "description": "Radial spectrum burst with a waveform ring. Also the small example plugin to copy from.",
+  "description": "Radial spectrum burst with a waveform ring. Turns with the tempo and sends a ring out on every kick. Also the small example plugin to copy from.",
   "shader": "scene.frag",
   "bloom": 1.0,
   "aberration": 0.6,

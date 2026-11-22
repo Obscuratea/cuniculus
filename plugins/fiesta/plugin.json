@@ -1,7 +1,7 @@
 {
   "name": "Fiesta",
   "author": "Cuniculus",
-  "description": "A fireworks show over a city and a lake. A shell goes up every second beat (rings, hearts, stars, willows), the skyline buildings are the spectrum, and the highs rain confetti.",
+  "description": "A fireworks show over a city and a lake. Every kick explodes a shell (rings, hearts, stars, willows) and snares pop crackles. The skyline buildings are the spectrum, the highs rain confetti, and searchlights sweep at full energy.",
   "shader": "scene.frag",
   "bloom": 0.9,
   "aberration": 0.4,

@@ -2,8 +2,10 @@
 //
 // The star has icosahedral symmetry, which gives three families of spikes:
 //   12 big spikes  = bass      20 medium spikes = mids      30 small spikes = highs
-// Around it a spectrum disk turns once every 16 beats, and each beat sends a thin ring across it.
-// The camera orbits at the tempo. Nothing is allowed to flash the whole frame.
+// Each spike family follows its own band, so a kick visibly punches the 12 big spikes out and lets
+// them sink back. Every kick also sends a ring across the spectrum disk and a shock shell out from
+// the star. The disk and the camera turn with the tempo. At full energy (a drop) two plasma jets
+// fire from the poles. Nothing is allowed to flash the whole frame.
 
 #define TAU 6.28318530718
 #define PI 3.14159265359
@@ -71,7 +73,7 @@ vec3 sky(vec3 d, float detail){
     vec2 q = vec2(cos(sp.x), sin(sp.x))*1.6 + vec2(0.0, sp.y*2.2);       // seamless around the horizon
     q += .35*vec2(fbm(q*1.3 + uTravel*.03), fbm(q*1.3 - uTravel*.025 + 4.0));
     float n = fbm(q*1.6 + vec2(0.0, uTravel*.02));
-    vec3 c = palette(n*.9 + sp.y*.15 + iTime*.015) * pow(n, 3.6) * (.16 + .22*uLevel);
+    vec3 c = palette(n*.9 + sp.y*.15 + iTime*.015) * pow(n, 3.6) * (.10 + .30*uEnergy*uLevel);
     c += palette(n*.5 + .5) * pow(fbm(q*3.1 - 9.0), 5.0) * .35;
     if (detail > 0.5){
         vec2 g = vec2(sp.x*40.0, sp.y*40.0);
@@ -100,8 +102,12 @@ vec3 disk(vec3 P, float I){
     float groove = smoothstep(.06, .0, abs(fract(r*5.0 - uBeatClock*.25) - .5) - .42);
     c += palette(r*.11 + .4) * groove * .05 * smoothstep(8.0, 2.0, r) * smoothstep(2.0, 2.2, r);
     // beat ring: thin, expanding, fading
-    float rs = 2.0 + (1.0 - uBeat)*7.5;
-    c += palette(uBeatCount*.137) * exp(-(r - rs)*(r - rs)*40.0) * 1.6 * uBeat * smoothstep(1.9, 2.2, r);
+    for (int j = 0; j < 4; j++){
+        float age = uOnsetAge[j];
+        if (age > 1.6) continue;
+        float rs = 1.6 + age*8.0;
+        c += palette(uOnsetId[j]*.137) * exp(-(r - rs)*(r - rs)*140.0) * 1.3 * uOnsetPow[j] * exp(-age*2.6) * smoothstep(1.9, 2.2, r);
+    }
     return c * smoothstep(11.0, 6.0, r);
 }
 
@@ -109,17 +115,17 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     vec2 uv = (fragCoord - .5*iResolution.xy) / iResolution.y;
     float I = uIntensity;
 
-    float bassB = max(uBass, spectrum(.08));
+    float bassB = uBass;
     gSpin = uTravel*.05 + iTime*.05;
-    gR = .78 + .10*uBass + .03*uBeat;
-    gH = vec3(.10 + .85*bassB*bassB, .06 + .70*uMid*uMid, .03 + .55*uHigh*uHigh) * mix(.6, 1.15, clamp(I*.5, 0.0, 1.0));
-    gH.x += .12*uBeat;
+    gR = .76 + .07*uBass + .06*uKick;
+    gH = vec3(.05 + .80*bassB*bassB, .04 + .62*uMid*uMid, .02 + .50*uHigh*uHigh) * mix(.6, 1.15, clamp(I*.5, 0.0, 1.0));
+    gH.x += .22*uKick;
     gK = vec3(34.0, 70.0, 150.0) * (1.0 + .5*uLevel);            // louder = sharper needles
 
     // camera orbits at the tempo: one lap every 64 beats, bobbing above and below the disk
     float ca = uBeatClock*TAU/64.0 + iTime*.02;
     float el = .34 + .22*sin(uBeatClock*TAU/48.0);
-    float dist = 6.4 - .7*uBass - .25*uBeat;
+    float dist = 6.4 - .45*uBass - .5*uKick;
     vec3 ro = dist*vec3(cos(ca)*cos(el), sin(el), sin(ca)*cos(el));
     vec3 fw = normalize(-ro);
     vec3 rt = normalize(cross(vec3(0, 1, 0), fw));
@@ -168,6 +174,32 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
         // corona hugging the star, breathing with the bass
         float bp = length(cross(ro, rd));
         col += palette(iTime*.04 + .1) * exp(-max(bp - gR, 0.0)*2.6) * (.05 + .3*uBass);
+        // shock shells: each kick blows a thin sphere of light outward
+        for (int j = 0; j < 4; j++){
+            float age = uOnsetAge[j];
+            if (age > 1.2) continue;
+            float rs = gR + .3 + age*4.5;
+            col += palette(uOnsetId[j]*.137 + .5) * exp(-(bp - rs)*(bp - rs)*400.0) * .6 * uOnsetPow[j] * exp(-age*3.5);
+        }
+    }
+
+    // plasma jets from the poles, only at full energy; they flicker with the highs
+    {
+        float jets = smoothstep(.72, .95, uEnergy);
+        if (jets > 0.0){
+            // closest approach between the view ray and the vertical axis through the star
+            vec2 o = ro.xz, d2 = rd.xz;
+            float tj = -dot(o, d2)/max(dot(d2, d2), 1e-5);
+            float dj = length(o + d2*tj);
+            float yj = ro.y + rd.y*tj;
+            if (tj > 0.0 && (tOrb < 0.0 || tj < tOrb || abs(yj) > gR)){
+                float along = abs(yj);
+                float wj = .03 + .05*along;
+                float flick = .6 + .4*sin(along*9.0 - iTime*14.0) * (.4 + .6*uHigh);
+                col += mix(palette(.55 + along*.1), vec3(1.0), .3) * exp(-dj*dj/(wj*wj)) * smoothstep(gR*.7, gR + .4, along)
+                       * exp(-along*.33) * jets * flick * (.5 + .7*uKick + .4*uBass) * min(I, 1.5);
+            }
+        }
     }
 
     // disk, in front of or behind the star
@@ -179,7 +211,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     // swirling feedback: the previous frame spirals outward, leaving galaxy arms behind bright things
     vec2 pc = fragCoord/iResolution.xy - .5;
     pc.x *= iResolution.x/iResolution.y;
-    pc = pc * rot(.012 + .02*uBass) * (.984 - .012*uBeat);
+    pc = pc * rot(.010 + .012*uBass + .012*uKick) * (.984 - .014*uKick);
     pc.x *= iResolution.y/iResolution.x;
     vec3 prev = min(texture(uPrev, pc + .5).rgb, vec3(2.0));
     col += prev * mix(.30 + .06*uLevel, .06, orbMask);

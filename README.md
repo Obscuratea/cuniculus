@@ -4,24 +4,29 @@ A music visualizer for whatever your system is playing, inspired by the rabbit-h
 tunnel from Sonique. *Cuniculus* is Latin for rabbit and for burrow.
 
 - Listens to system output through PipeWire. No player, no setup.
-- **Rabbit Hole**: a twisting neon tunnel. Wall panels are the spectrum, rings follow the
-  mids, sparks follow the highs, every beat fires a shockwave, and the tunnel changes
-  shape every 16 beats.
-- **Lodestar**: a liquid-metal star whose spikes are the bass, mids and highs, ringed by a
-  spectrum disk that turns in time with the tempo.
-- **Cymatica**: glowing sand on a vibrating Chladni plate. Bass, mids and highs each
-  follows the pitch of the music: low sounds make a few big shapes, higher sounds make finer
-  lattices, and as the pitch slides the lines morph from one figure to the next. Every bass hit
-  tosses grains of sand into the air, and they arc back down onto the plate.
-- **Fiesta**: fireworks over a city and a lake. A shell goes up every second beat (rings,
-  hearts, stars, willows), the skyline is the spectrum, the highs rain confetti.
-- **Nova**: a small radial spectrum burst, and the example plugin to copy.
+- **Rabbit Hole**: a twisting neon tunnel. Wall panels are the spectrum, floating rings follow
+  the mids, glitter follows the highs, and light trails weave down the middle. Every kick fires
+  a ring of light ahead of you, surges the speed and steps the colours; the tunnel changes
+  shape every 16 kicks, and a laser fan opens up when the track is at full energy.
+- **Lodestar**: a liquid-metal star with three families of spikes, one each for bass, mids and
+  highs, so a kick visibly punches the big spikes out. A spectrum disk turns with the tempo,
+  every kick sends out a ring and a shock shell, and plasma jets fire at full energy.
+- **Cymatica**: glowing sand on a vibrating Chladni plate. The pattern follows the pitch of the
+  music: low sounds make a few big shapes, higher sounds make finer lattices, and as the pitch
+  slides the lines morph from one figure to the next. Every bass hit tosses grains of sand
+  into the air. Rings of LEDs around the plate act as a level meter with depth: the outer
+  rings only light in a loud, intense part, and every kick sends a pulse out through them.
+- **Fiesta**: fireworks over a city and a lake. Every kick explodes a shell (rings, hearts,
+  stars, willows), snares pop crackles, the skyline is the spectrum, the highs rain confetti,
+  and searchlights sweep when the track is at full energy.
+- **Nova**: a radial spectrum burst that turns with the tempo and sends a ring out on every
+  kick. Also the small example plugin to copy.
 - Visualizers are plugins: a folder with one shader file. See [PLUGINS.md](PLUGINS.md).
 
 ## Run
 
     ./run.sh            # system audio
-    ./run.sh --demo     # built-in test beat, no sound needed
+    ./run.sh --demo     # built-in silent demo track (breakdown, build, drop), no sound needed
     ./install.sh        # adds Cuniculus to the app launcher (no sudo)
 
 ## Requirements

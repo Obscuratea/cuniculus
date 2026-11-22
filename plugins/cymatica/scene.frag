@@ -4,7 +4,8 @@
 // shapes, higher sounds make finer and finer lattices, and as the pitch of the music slides the
 // lines morph smoothly from one figure to the next (uPitch picks a point in a ladder of plate
 // modes and blends the two neighbours). Every bass hit throws grains off the lines into the air,
-// where they fly in a real arc and fall back onto the plate.
+// where they fly in a real arc and fall back onto the plate. Around the plate, rings of LEDs act
+// as a level meter with depth: outer rings light only when the music is loud and intense.
 
 #define PI 3.14159265359
 #define TAU 6.28318530718
@@ -51,6 +52,49 @@ float airAlt(vec2 cell){
     return 0.0;
 }
 
+// LED rings: a bowl of lights rising around the plate, each ring further out and higher (so nearer
+// the camera, which is what gives them depth). They work like a level meter: the inner ring lights
+// first and the outer ones need the music to be louder and more intense. Each LED also follows its
+// slice of the spectrum, and every kick sends a pulse out from ring to ring.
+vec3 ledRings(vec3 ro, vec3 rd, float I){
+    vec3 col = vec3(0.0);
+    if (rd.y >= 0.0) return col;
+    // energy tells a breakdown from a drop; level adds the moment-to-moment loudness; kicks push it over
+    float L = clamp((pow(uEnergy, 1.5)*(.55 + .45*uLevel) + .15*uKick)*(.8 + .2*min(I, 1.6)), 0.0, 1.0);
+    const int K = 7;
+    for (int k = 0; k < K; k++){
+        float fk = float(k);
+        float R = 1.22 + .30*fk + .03*fk*fk;
+        float y = .04 + .13*fk + .035*fk*fk;
+        float t = (y - ro.y)/rd.y;
+        if (t <= 0.0) continue;
+        vec3 P = ro + rd*t;
+        float r = length(P.xz);
+        float w = .026 + .004*fk;
+        if (abs(r - R) > w*4.0) continue;
+        float n = 40.0 + 10.0*fk;
+        float a = atan(P.z, P.x)/TAU + (mod(fk, 2.0) < .5 ? 1.0 : -1.0)*uBeatClock/(96.0 + 16.0*fk);
+        float dd = length(vec2(r - R, (fract(a*n) - .5)*TAU*R/n));
+        float led = smoothstep(w, w*.5, dd);
+        float halo = exp(-dd*dd/(w*w*3.0));
+        float thr = (fk + .5)/float(K);
+        float on = smoothstep(thr - .10, thr + .02, L);
+        float wave = 0.0;
+        for (int j = 0; j < 4; j++){
+            float age = uOnsetAge[j];
+            if (age > 1.5) continue;
+            float pos = age*15.0 - .7;
+            wave += uOnsetPow[j]*exp(-(fk - pos)*(fk - pos)*.9)*exp(-age*1.6);
+        }
+        float cellA = (floor(a*n) + .5)/n;
+        float sp = spectrum(abs(fract(cellA*2.0)*2.0 - 1.0)*.85);
+        float b = on*(.30 + .95*sp) + wave*1.1;
+        vec3 c = palette(.06 + .8*uPitch + fk*.07 + iTime*.012);
+        col += c*(led*(.03 + 1.25*b) + halo*b*.22);
+    }
+    return col*min(I, 1.6);
+}
+
 void mainImage(out vec4 fragColor, in vec2 fragCoord){
     vec2 uv = (fragCoord - .5*iResolution.xy) / iResolution.y;
     float I = uIntensity;
@@ -61,11 +105,11 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     gA = MODES[i0];
     gB = MODES[min(i0 + 1, NM - 1)];
     gF = smoothstep(0.0, 1.0, fract(u));
-    gWidth = .022 + .012*(1.0 - uLevel) + .035*uBeat;
+    gWidth = .022 + .012*(1.0 - uLevel) + .03*uKick;
 
     // camera looks down at the plate, rocking with the tempo and leaning in on the bass
     float el = 1.0 + .12*sin(uBeatClock*TAU/16.0);
-    float dist = 3.1 - .12*uBass;
+    float dist = 3.45 - .10*uBass - .08*uKick;
     vec3 ro = dist*vec3(.18*sin(uBeatClock*TAU/32.0), sin(el), -cos(el));
     vec3 fw = normalize(-ro);
     vec3 rt = normalize(cross(vec3(0, 1, 0), fw));
@@ -112,8 +156,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
             // soft glow along the nodal lines
             col += pal * exp(-(f0*f0)/(gWidth*gWidth*6.0)) * (.015 + .07*uLevel) * min(I, 1.5);
             // the bolt in the middle that drives the plate, and the rim
-            col += pal * smoothstep(.035, .022, rr) * (.12 + .7*uBeat);
-            col += pal * smoothstep(.02, .0, abs(rr - .985)) * (.25 + .8*uBass + .8*uBeat);
+            col += pal * smoothstep(.035, .022, rr) * (.12 + .9*uKick);
+            col += pal * smoothstep(.02, .0, abs(rr - .985)) * (.25 + .5*uBass + .9*uKick);
             col *= smoothstep(1.0, .985, rr) + smoothstep(.02, .0, abs(rr - .985));
         }
         col += palette(iTime*.02 + .3) * exp(-max(rr - 1.0, 0.0)*4.0) * (1.0 - onPlate) * (.02 + .06*uLevel);
@@ -141,6 +185,8 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
             col += mix(pal, vec3(1.0, .97, .9), .6) * best * 2.6 * min(I, 1.6);
         }
     }
+
+    col += ledRings(ro, rd, I);
 
     // afterglow: moving sand and tossed grains leave a short trace
     vec2 puv = fragCoord/iResolution.xy;

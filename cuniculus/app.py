@@ -40,7 +40,7 @@ class Window(QWidget):
         self.resize(1280, 720)
         self.setMinimumSize(320, 200)
         self.setStyleSheet(STYLE)
-        self.audio = AudioEngine(demo=args.demo)
+        self.audio = AudioEngine(demo=args.demo, demo_at=args.demo_at)
         self.plugins = discover()
         self.settings = self._load_settings()
         self.view = GLView(self.audio, self)
@@ -246,7 +246,9 @@ class Window(QWidget):
 
 def main() -> int:
     ap = argparse.ArgumentParser(prog="cuniculus", description="Music visualizer for system audio.")
-    ap.add_argument("--demo", action="store_true", help="use a built-in test signal instead of system audio")
+    ap.add_argument("--demo", action="store_true", help="play a built-in silent demo track (breakdown, build, drop) instead of system audio")
+    ap.add_argument("--demo-at", type=float, default=0.0, metavar="SEC",
+                    help="start the demo track this far in (0 breakdown, 15 build, 22.5 drop, 52.5 outro)")
     ap.add_argument("--plugin", help="plugin id (folder name) to start with")
     ap.add_argument("--palette", type=int, help="palette index to start with")
     ap.add_argument("--fullscreen", action="store_true")

@@ -44,7 +44,7 @@ uniform float iTime, iTimeDelta;
 uniform int iFrame;
 uniform float uBass, uMid, uHigh, uLevel;
 uniform float uBeat, uBeatCount, uBeatPhase, uBeatClock, uBpm;
-uniform float uTravel, uIntensity, uPitch;
+uniform float uTravel, uIntensity, uPitch, uEnergy, uKick, uKickCount;
 uniform vec4 uOnsetAge, uOnsetPow, uOnsetId;
 uniform sampler2D uSpectrum, uWave, uPrev;
 uniform vec3 uPalA, uPalB, uPalC, uPalD;
@@ -164,7 +164,7 @@ class GLView(QOpenGLWidget):
         self.hits: list[tuple[float, float, int]] = []
         self.seen_beats = 0
         self.seen_bass = 0
-        self.sm = dict(bass=0.0, mid=0.0, high=0.0, level=0.0)
+        self.sm = dict(bass=0.0, mid=0.0, high=0.0, level=0.0, energy=0.0)
         self.bpm = 0.0
         self.status = ""
         self.fps = 0.0
@@ -300,20 +300,20 @@ class GLView(QOpenGLWidget):
         for name in self.sm:
             self.sm[name] += (getattr(ft, name) - self.sm[name]) * k
         beat = math.exp(-max(time.monotonic() - ft.last_beat, 0.0) * 5.0)
-        if ft.beat_count != self.seen_beats:
-            self.seen_beats = ft.beat_count
-            self.kick = 1.0
+        self.seen_beats = ft.beat_count
         if ft.bass_hits != self.seen_bass:      # a real bass hit: remember when, how hard and which one
             self.seen_bass = ft.bass_hits
             self.hits = (self.hits + [(now, ft.bass_power, ft.bass_hits % 4096)])[-4:]
-        self.kick *= math.exp(-dt * 4.0)
+            self.kick = ft.bass_power
+        self.kick *= math.exp(-dt * 5.0)
         self.pitch += (ft.pitch - self.pitch) * (1.0 - math.exp(-dt * 5.0))
         # beat clock: run at the tempo between audio updates, ease towards the analyser's value
-        self.clock += dt * (ft.bpm if ft.bpm > 0 else 120.0) / 60.0
+        self.clock += dt * (ft.bpm if ft.bpm > 0 else 70.0 * ft.level) / 60.0
         err = ft.beat_clock - self.clock
         self.clock += err if abs(err) > 2.0 else err * min(1.0, dt * 6.0)
         inten = self.intensity
-        speed = 0.7 + inten * (3.2 * self.sm["level"] + 2.2 * self.sm["bass"] + 3.0 * self.kick)
+        speed = 0.35 + inten * (1.6 * self.sm["level"] + 1.6 * self.sm["energy"] * self.sm["level"]
+                                + 1.2 * self.sm["bass"] + 4.0 * self.kick)
         self.travel += dt * speed
 
         f.glDisable(GL_BLEND)
@@ -349,6 +349,9 @@ class GLView(QOpenGLWidget):
         p.setUniformValue("uBeatPhase", float(ft.beat_phase))
         p.setUniformValue("uBpm", float(ft.bpm))
         p.setUniformValue("uPitch", float(self.pitch))
+        p.setUniformValue("uEnergy", float(min(self.sm["energy"], 1.0)))
+        p.setUniformValue("uKick", float(self.kick))
+        p.setUniformValue("uKickCount", float(ft.bass_hits % 4096))
         recent = sorted(self.hits, reverse=True) + [(now - 99.0, 0.0, 0)] * 4
         ages = [min(now - h[0], 99.0) for h in recent[:4]]
         p.setUniformValue("uOnsetAge", QVector4D(*ages))
@@ -385,7 +388,7 @@ class GLView(QOpenGLWidget):
         pl = self.plugin
         c.setUniformValue("uBloomAmt", float((pl.bloom if pl else 0.8) / BLOOM_LEVELS * 2.0))
         c.setUniformValue("uAberr", float((pl.aberration if pl else 1.0) * inten
-                                          * (0.012 + 0.03 * beat + 0.015 * self.sm["bass"])))
+                                          * (0.012 + 0.035 * self.kick + 0.01 * self.sm["bass"])))
         c.setUniformValue("uFlash", 0.0)   # full-screen beat flash removed: it hid the visuals
         c.setUniformValue("uTime", float(now - self.t0))
         f.glDrawArrays(GL_TRIANGLES, 0, 3)
