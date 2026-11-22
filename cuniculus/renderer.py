@@ -163,6 +163,7 @@ class GLView(QOpenGLWidget):
         self.pitch = 0.5
         self.hits: list[tuple[float, float, int]] = []
         self.seen_beats = 0
+        self.seen_bass = 0
         self.sm = dict(bass=0.0, mid=0.0, high=0.0, level=0.0)
         self.bpm = 0.0
         self.status = ""
@@ -302,8 +303,9 @@ class GLView(QOpenGLWidget):
         if ft.beat_count != self.seen_beats:
             self.seen_beats = ft.beat_count
             self.kick = 1.0
-            if ft.bass > 0.18:        # a bass hit: remember when, how hard and which one
-                self.hits = (self.hits + [(now, min(1.0, 0.35 + ft.bass), ft.beat_count % 4096)])[-4:]
+        if ft.bass_hits != self.seen_bass:      # a real bass hit: remember when, how hard and which one
+            self.seen_bass = ft.bass_hits
+            self.hits = (self.hits + [(now, ft.bass_power, ft.bass_hits % 4096)])[-4:]
         self.kick *= math.exp(-dt * 4.0)
         self.pitch += (ft.pitch - self.pitch) * (1.0 - math.exp(-dt * 5.0))
         # beat clock: run at the tempo between audio updates, ease towards the analyser's value
