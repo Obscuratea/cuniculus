@@ -21,7 +21,7 @@ tunnel from Sonique. *Cuniculus* is Latin for rabbit and for burrow.
 - **Rabbit Hole**: a twisting neon tunnel. Wall panels are the spectrum, floating rings follow
   the mids, glitter follows the highs, and light trails weave down the middle. Every kick fires
   a ring of light ahead of you, surges the speed and steps the colours; the tunnel changes
-  shape every 16 kicks, and a laser fan opens up when the track is at full energy.
+  shape every 16 kicks.
 - **Lodestar**: a liquid-metal star with three families of spikes, one each for bass, mids and
   highs, so a kick visibly punches the big spikes out. A spectrum disk turns with the tempo,
   every kick sends out a ring and a shock shell, and particle streams open from the poles at full energy.

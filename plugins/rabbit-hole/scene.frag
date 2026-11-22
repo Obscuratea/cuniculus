@@ -1,7 +1,7 @@
 // Rabbit Hole - Cuniculus' main visualizer.
 // Bass: tunnel breathes, camera pushes in.   Mids: floating neon rings.
 // Highs: glitter.   Spectrum: the wall panels.   Kick: a ring of light racing ahead, a speed surge and
-// a colour step; the tunnel changes shape every 16 kicks.   Energy (breakdown vs drop): laser fan.   Light trails and galaxy dust streams weave down the middle.
+// a colour step; the tunnel changes shape every 16 kicks.   Light trails and galaxy dust streams weave down the middle.
 // Rule: nothing may flash the whole screen. Keep the walls dark enough to see the hole.
 
 #define TAU 6.28318530718
@@ -187,15 +187,6 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     float e = max(dot(rd, endDir), 0.0);
     col += palette(iTime*.07) * (pow(e, 260.0)*(.5 + 1.6*uKick + .5*uBass) + pow(e, 14.0)*.04*(1.0 + uLevel));
 
-    // laser fan from the far end: only when the track is at full energy, sweeping at the tempo
-    {
-        vec3 ex = normalize(cross(endDir, vec3(0, 1, 0))), ey = cross(endDir, ex);
-        vec2 ev = vec2(dot(rd, ex), dot(rd, ey));
-        float ea = atan(ev.y, ev.x), er = length(ev);
-        float fan = pow(.5 + .5*sin(ea*5.0 + uBeatClock*TAU/8.0), 60.0) + pow(.5 + .5*sin(-ea*3.0 + uBeatClock*TAU/16.0 + 1.0), 90.0);
-        col += palette(ea/TAU + uKickCount*.09) * fan * exp(-er*3.2) * smoothstep(.02, .12, er)
-               * smoothstep(.72, .95, uEnergy) * (.25 + .9*uHigh + .6*uKick) * min(I, 1.5);
-    }
 
     // sparks streaking past, driven by the highs
     float ang = atan(uv.y, uv.x)/TAU, rad = length(uv);
