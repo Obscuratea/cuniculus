@@ -44,6 +44,8 @@ colour fringing, tonemapping, vignette and grain afterwards.
 | `uBeatCount` | float | number of beats so far |
 | `uBeatPhase` | float | 0..1 position between beats from the BPM clock |
 | `uBeatClock` | float | beats elapsed as a smooth number; use it to move or spin things at the tempo |
+| `uPitch` | float | 0..1, where the sound's centre of mass sits (low to high), stretched to the range the music has covered recently |
+| `uOnsetAge`, `uOnsetPow`, `uOnsetId` | vec4 | the last 4 bass hits, newest first: seconds since each, strength 0..1, and a number unique to each (for hashing). Age is 99 when there is no hit |
 | `uBpm` | float | tempo estimate, 0 if unknown |
 | `uTravel` | float | distance that grows faster when the music is louder |
 | `uIntensity` | float | the user's intensity slider, 0.2..2.0 |

@@ -7,7 +7,7 @@ import time
 
 import numpy as np
 from PyQt6.QtCore import QFileSystemWatcher, pyqtSignal
-from PyQt6.QtGui import QSurfaceFormat, QVector3D
+from PyQt6.QtGui import QSurfaceFormat, QVector3D, QVector4D
 from PyQt6.QtOpenGL import (QOpenGLFramebufferObject, QOpenGLFramebufferObjectFormat,
                             QOpenGLShader, QOpenGLShaderProgram, QOpenGLVersionFunctionsFactory,
                             QOpenGLVersionProfile, QOpenGLVertexArrayObject)
@@ -44,7 +44,8 @@ uniform float iTime, iTimeDelta;
 uniform int iFrame;
 uniform float uBass, uMid, uHigh, uLevel;
 uniform float uBeat, uBeatCount, uBeatPhase, uBeatClock, uBpm;
-uniform float uTravel, uIntensity;
+uniform float uTravel, uIntensity, uPitch;
+uniform vec4 uOnsetAge, uOnsetPow, uOnsetId;
 uniform sampler2D uSpectrum, uWave, uPrev;
 uniform vec3 uPalA, uPalB, uPalC, uPalD;
 out vec4 cu_FragColor;
@@ -159,6 +160,8 @@ class GLView(QOpenGLWidget):
         self.travel = 0.0
         self.kick = 0.0
         self.clock = 0.0
+        self.pitch = 0.5
+        self.hits: list[tuple[float, float, int]] = []
         self.seen_beats = 0
         self.sm = dict(bass=0.0, mid=0.0, high=0.0, level=0.0)
         self.bpm = 0.0
@@ -299,7 +302,10 @@ class GLView(QOpenGLWidget):
         if ft.beat_count != self.seen_beats:
             self.seen_beats = ft.beat_count
             self.kick = 1.0
+            if ft.bass > 0.18:        # a bass hit: remember when, how hard and which one
+                self.hits = (self.hits + [(now, min(1.0, 0.35 + ft.bass), ft.beat_count % 4096)])[-4:]
         self.kick *= math.exp(-dt * 4.0)
+        self.pitch += (ft.pitch - self.pitch) * (1.0 - math.exp(-dt * 5.0))
         # beat clock: run at the tempo between audio updates, ease towards the analyser's value
         self.clock += dt * (ft.bpm if ft.bpm > 0 else 120.0) / 60.0
         err = ft.beat_clock - self.clock
@@ -340,6 +346,12 @@ class GLView(QOpenGLWidget):
         p.setUniformValue("uBeatCount", float(ft.beat_count % 4096))
         p.setUniformValue("uBeatPhase", float(ft.beat_phase))
         p.setUniformValue("uBpm", float(ft.bpm))
+        p.setUniformValue("uPitch", float(self.pitch))
+        recent = sorted(self.hits, reverse=True) + [(now - 99.0, 0.0, 0)] * 4
+        ages = [min(now - h[0], 99.0) for h in recent[:4]]
+        p.setUniformValue("uOnsetAge", QVector4D(*ages))
+        p.setUniformValue("uOnsetPow", QVector4D(*[h[1] for h in recent[:4]]))
+        p.setUniformValue("uOnsetId", QVector4D(*[float(h[2]) for h in recent[:4]]))
         p.setUniformValue("uBeatClock", float(self.clock % 3840.0))
         p.setUniformValue("uTravel", float(self.travel))
         p.setUniformValue("uIntensity", float(inten))

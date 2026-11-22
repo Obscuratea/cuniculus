@@ -10,9 +10,9 @@ tunnel from Sonique. *Cuniculus* is Latin for rabbit and for burrow.
 - **Lodestar**: a liquid-metal star whose spikes are the bass, mids and highs, ringed by a
   spectrum disk that turns in time with the tempo.
 - **Cymatica**: glowing sand on a vibrating Chladni plate. Bass, mids and highs each
-  mix three layers of plate patterns (broad for bass, finer for mids, intricate for highs), and
-  louder bands pull the figure towards their kind of shape. The exact patterns are re-picked on
-  a timer, every 8 beats, and blend over one beat. Each beat makes the sand lines flash wider.
+  follows the pitch of the music: low sounds make a few big shapes, higher sounds make finer
+  lattices, and as the pitch slides the lines morph from one figure to the next. Every bass hit
+  tosses grains of sand into the air, and they arc back down onto the plate.
 - **Fiesta**: fireworks over a city and a lake. A shell goes up every second beat (rings,
   hearts, stars, willows), the skyline is the spectrum, the highs rain confetti.
 - **Nova**: a small radial spectrum burst, and the example plugin to copy.

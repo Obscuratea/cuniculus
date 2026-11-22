@@ -37,6 +37,7 @@ class Features:
     wave: np.ndarray = field(default_factory=lambda: np.zeros(NWAVE, np.float32))
     status: str = "starting"
     beat_clock: float = 0.0          # continuous beat position from the BPM clock
+    pitch: float = 0.5               # where the sound's centre of mass sits, 0 (low) .. 1 (high), self-ranging
 
 
 class Analyzer:
@@ -60,6 +61,8 @@ class Analyzer:
         self.spec = np.zeros(NBANDS, np.float32)
         self.prev_norm = np.zeros(NBANDS, np.float32)
         self.bass = self.mid = self.high = self.level = 0.0
+        self.cent, self.cl, self.ch, self.pitch = 0.5, 0.4, 0.6, 0.5
+        self.idx = np.arange(NBANDS, dtype=np.float32) / (NBANDS - 1)
 
         self.flux_hist = np.zeros(int(HOP_RATE * 8), np.float32)
         self.prev_flux = 0.0
@@ -91,6 +94,17 @@ class Analyzer:
             norm = np.clip((db - (self.peak_db - 48.0)) / 48.0, 0.0, 1.0).astype(np.float32)
 
         self.spec = np.maximum(norm, self.spec * 0.90)
+        # pitch: energy-weighted centre of the spectrum (log frequency), smoothed, then stretched
+        # over the range it has recently covered so that any music moves across 0..1
+        w = norm * norm
+        tot = float(w.sum())
+        if tot > 1.0:
+            c = float((w * self.idx).sum()) / tot
+            self.cent += (c - self.cent) * (1.0 - np.exp(-HOP_DT / 0.25))
+            self.cl += (self.cent - self.cl) * 0.0004
+            self.ch += (self.cent - self.ch) * 0.0004
+            self.cl, self.ch = min(self.cl, self.cent), max(self.ch, self.cent)
+            self.pitch = float(np.clip((self.cent - self.cl) / max(self.ch - self.cl, 0.12), 0.0, 1.0))
         self.bass = self._follow(self.bass, float(norm[self.m_bass].mean()) * 1.25, 0.65, 0.12)
         self.mid = self._follow(self.mid, float(norm[self.m_mid].mean()) * 1.25, 0.5, 0.10)
         self.high = self._follow(self.high, float(norm[self.m_high].mean()) * 1.5, 0.5, 0.12)
@@ -175,7 +189,7 @@ class AudioEngine:
     def _publish(self, status: str) -> None:
         a = self.an
         f = Features(a.bass, a.mid, a.high, a.level, a.bpm, a.phase % 1.0, a.beat_count,
-                     a.last_beat, a.spec.copy(), a.wave(), status, a.phase)
+                     a.last_beat, a.spec.copy(), a.wave(), status, a.phase, a.pitch)
         with self.lock:
             self.feat = f
 
@@ -184,7 +198,7 @@ class AudioEngine:
             f = self.feat
             self.feat = Features(0, 0, 0, 0, 0, 0, f.beat_count, f.last_beat,
                                  np.zeros(NBANDS, np.float32),
-                                 np.full(NWAVE, 0.5, np.float32), status, f.beat_clock)
+                                 np.full(NWAVE, 0.5, np.float32), status, f.beat_clock, f.pitch)
 
     def _run(self) -> None:
         if self.demo:
